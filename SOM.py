@@ -248,7 +248,7 @@ class SOM(object):
 
                 ax.quiver(layer0[i,0],layer0[i,1],layer0[i,2],u,v,w,pivot='tail')
 
-        plt.show()
+        #plt.show()  #eddited recently
                 
     def fit_2d_2frames(self,frame1,frame2,epoch):
         '''
@@ -303,31 +303,66 @@ class SOM(object):
         elif frame1.frame_dimension == 3:
             self.draw2Frame(frame1.particles,frame2.particles,pair,_3d = True)
         #print('difference',layer0-layer1)
+        return self.checkSimilarity(layer0,layer1)[0] ## new added
 
+def main():
+    som = SOM()
+    num_particles = 200
+    
+    f1 = Frame(3,[1000,1000,1000],num_particles)
+    f1.random_particle()
 
-som = SOM()
-#f1 = Frame(2,[1000,1000],10)
-f1 = Frame(3,[1000,1000,1000],300)
+    distance = f1.statistics_2d()
+    
+    phi = np.linspace(0.5,2,20)
 
-f1.random_particle()
-print('f1 particles',f1.particles)
-#f2 = Frame(2,[1000,1000],200)
-#velocity = [10,20]
+    velocities = []
 
-velocity = [20,20,20]
+    for p in phi:
+        v = distance / p
+        print('v',v)
+        velocities.append([v,v,v])
 
-f2 = f1.move_particles(velocity)
-print('f2 particles',f2.particles)
-#f2 = f1.move_rotation_2d(5)
-##print('f1.partilces',f1.particles)
-##print('f2.particles',f2.particles)
-#np.random.shuffle(f2.particles)
-#print(f2.particles-f1.particles)
-som.fit_2d_2frames(f1,f2,100)
+    results = []
 
-_,nb_accu = nb(f1,f2,velocity)
+    for i in range(len(phi)):
+        f2 = f1.move_particles(velocities[i])
 
-print('neighbor method accu is ',nb_accu)
+        som_accu = som.fit_2d_2frames(f1,f2,100)
 
-print('frame distance',f1.statistics_2d())
-plt.show()
+        _,nb_accu = nb(f1,f2,velocities[i])
+
+        results.append([som_accu,nb_accu,])
+
+    with open('results.txt', 'w') as filehandle:  
+        for listitem in results:
+            filehandle.write('%s\n' % listitem)    
+
+main()
+
+##som = SOM()
+###f1 = Frame(2,[1000,1000],10)
+##f1 = Frame(3,[1000,1000,1000],300)
+##
+##f1.random_particle()
+##print('f1 particles',f1.particles)
+###f2 = Frame(2,[1000,1000],200)
+###velocity = [10,20]
+##
+##velocity = [25,25,25]
+##
+##f2 = f1.move_particles(velocity)
+##print('f2 particles',f2.particles)
+###f2 = f1.move_rotation_2d(5)
+####print('f1.partilces',f1.particles)
+####print('f2.particles',f2.particles)
+###np.random.shuffle(f2.particles)
+###print(f2.particles-f1.particles)
+##som.fit_2d_2frames(f1,f2,50)
+##
+##_,nb_accu = nb(f1,f2,velocity)
+##
+##print('neighbor method accu is ',nb_accu)
+##
+##print('frame distance',f1.statistics_2d())
+##plt.show()
