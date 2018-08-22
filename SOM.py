@@ -191,6 +191,24 @@ class SOM(object):
             #print('dist',dist)
             layer[i] += alpha * displacement * np.exp(-dist**2 / sigma**2)
 
+    def move_direction(self,layer,winner,displacement,sigma,alpha,direction):
+        '''
+        : layer            The particles to move
+        : winner           The center to determine the displacement
+        : displacement     The distance to move particles
+        : sigma            The sigma to divide e.g. exp(-d**2/sigma**2)
+        : direction        The direction to determine the angle between direction and displacement
+        '''
+        for i in range(len(layer)):
+            dist = np.linalg.norm(layer[i]-winner)
+
+            #print('angle is',self.find_angle(displacement,v1 = direction))
+            if self.find_angle(displacement,v1 = direction) < 30:
+                alpha *= 0
+
+            
+            layer[i] += alpha * displacement * np.exp(-dist**2 / sigma**2)
+            
     def checkSimilarity(self,layer0,layer1):
         '''
         : layer0, layer1   The two sets of particles to check similarity
@@ -249,6 +267,28 @@ class SOM(object):
                 ax.quiver(layer0[i,0],layer0[i,1],layer0[i,2],u,v,w,pivot='tail')
 
         #plt.show()  #eddited recently
+
+    def find_angle(self,v2,v1 = np.array([1,1,1]),original = np.array([0,0,0])):
+        '''
+        : v2, v1           The second vector and the first vector
+        : original         The zero point to normalize two vectors
+        '''
+        v2 = np.array(v2)
+        v1 = np.array(v1)
+            
+        v2 = v2 - original
+        v1 = v1 - original
+
+        cosine_angle = np.dot(v2,v1) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+
+##        print('dot product is ',(np.dot(v2,v1)))
+##        print('v1 norm is',np.linalg.norm(v1))
+##        print('v2 norm is',np.linalg.norm(v2))
+##        print('cos angle is ',cosine_angle)
+        if np.absolute(cosine_angle  - 1) < 0.0001:
+            return 0
+        else:
+            return np.arccos(cosine_angle) * 180 / np.pi
                 
     def fit_2d_2frames(self,frame1,frame2,epoch):
         '''
@@ -305,41 +345,152 @@ class SOM(object):
         #print('difference',layer0-layer1)
         return self.checkSimilarity(layer0,layer1)[0] ## new added
 
+    def fit_iteration(self,frame1,frame2,epoch):
+        '''
+        : frame 1          The first layer's initiate value
+        : frame 2          The second layer's initiate value
+        : epoch            The iteration times in fit, one epoch means update the second layer by the first and then update the first layer by the second
+        '''
+        #print('self layer num',self.layer_num)
+
+        if self.layer_num != 2:
+            print('layer number does not match')
+        else:
+            self.layer[0] = frame1.particles
+            self.layer[1] = frame2.particles
+
+        layer0 = np.array(self.layer[0]).copy()
+        layer1 = np.array(self.layer[1]).copy()
+
+        '''
+        : alpha is the initial coefficient to move particle  movement = alpha * distance
+        : r     is the initial distance between particles
+        '''
+
+        alpha = 0.1
+        r0 = frame1.statistics_2d()
+        r1 = frame2.statistics_2d()
+
+        print('similarity before',self.checkSimilarity(layer0,layer1)[0])
+
+        a = self.generateGaussian(alpha,0.01,1,epoch)
+
+        r00 = self.generateGaussian(r0,0.3*r0,1,epoch)
+        r11 = self.generateGaussian(r1,0.3*r0,1,epoch)
+
+        for e in range(epoch):
+            for i in range(len(layer0)):
+                winner, displacement = self.findClosest(layer0[i],layer1)
+
+                direction = [1,1,1]
+                
+                self.move_direction(layer1,winner,displacement,r11[e],a[e],direction)
+            print('in ' + str(e) + ' epoch' + ' the accuracy is: ')
+            accu,_ = self.checkSimilarity(layer0,layer1)
+            print(accu)
+        #print(layer1)
+        _ , pair = self.checkSimilarity(layer0,layer1)
+        print('similarity after',self.checkSimilarity(layer0,layer1)[0])
+
+        
+        if frame1.frame_dimension == 2:
+            self.draw2Frame(frame1.particles,frame2.particles,pair,_3d = False)
+            plt.scatter(frame1.frame_size[0]/2,frame1.frame_size[1]/2,color = 'b',s=50,marker = 'v',label='center') # plot the center of frame
+        elif frame1.frame_dimension == 3:
+            self.draw2Frame(frame1.particles,frame2.particles,pair,_3d = True)
+        #print('difference',layer0-layer1)
+        return self.checkSimilarity(layer0,layer1)[0] ## new added
+
+PARTICLE_NUM = 30
+ITERATION = 300
+
+PHI_LEFT = 1.5
+PHI_RIGHT = 1
+NUM_PHI = 1
+
+PHI = np.linspace(PHI_LEFT,PHI_RIGHT,NUM_PHI)
+
+f1 = Frame(3,[1000,1000,1000],PARTICLE_NUM)
+
+distance = f1.statistics_2d()
+
+f1.random_particle()
+
+velocities = []
+
+for p in PHI:
+    v = distance / p
+    print('v',v)
+    velocities.append([v,v,v])
+    
 def main():
     som = SOM()
-    num_particles = 200
+    #num_particles = 300
     
-    f1 = Frame(3,[1000,1000,1000],num_particles)
-    f1.random_particle()
+##    f1 = Frame(3,[1000,1000,1000],PARTICLE_NUM)
+##    f1.random_particle()
 
-    distance = f1.statistics_2d()
+##    distance = f1.statistics_2d()
     
-    phi = np.linspace(0.5,2,20)
+##    phi = np.linspace(0.5,3,10)
 
-    velocities = []
+##    velocities = []
 
-    for p in phi:
-        v = distance / p
-        print('v',v)
-        velocities.append([v,v,v])
+##    for p in PHI:
+##        v = distance / p
+##        print('v',v)
+##        velocities.append([v,v,v])
 
     results = []
 
-    for i in range(len(phi)):
+    for i in range(len(PHI)):
         f2 = f1.move_particles(velocities[i])
 
-        som_accu = som.fit_2d_2frames(f1,f2,100)
+        som_accu = som.fit_2d_2frames(f1,f2,ITERATION)
 
         _,nb_accu = nb(f1,f2,velocities[i])
 
-        results.append([som_accu,nb_accu,])
+        results.append([som_accu,nb_accu,PHI[i]])
 
-    with open('results.txt', 'w') as filehandle:  
+    with open('results_raw.txt', 'w') as filehandle:  
         for listitem in results:
             filehandle.write('%s\n' % listitem)    
 
-main()
+def main_iteration():
+    som = SOM()
+    #num_particles = 300
+    
+##    f1 = Frame(3,[1000,1000,1000],PARTICLE_NUM)
+##    f1.random_particle()
 
+##    distance = f1.statistics_2d()
+    
+##    phi = np.linspace(0.5,3,10)
+
+##    velocities = []
+##
+##    for p in PHI:
+##        v = distance / p
+##        print('v',v)
+##        velocities.append([v,v,v])
+
+    results = []
+
+    for i in range(len(PHI)):
+        f2 = f1.move_particles(velocities[i])
+
+        som_accu = som.fit_iteration(f1,f2,ITERATION)
+
+        _,nb_accu = nb(f1,f2,velocities[i])
+
+        results.append([som_accu,nb_accu,PHI[i]])
+
+    with open('results_iteration.txt', 'w') as filehandle:  
+        for listitem in results:
+            filehandle.write('%s\n' % listitem)   
+
+main()
+main_iteration()
 ##som = SOM()
 ###f1 = Frame(2,[1000,1000],10)
 ##f1 = Frame(3,[1000,1000,1000],300)
