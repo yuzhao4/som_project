@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from nearest_neighbor import nb
 from mpl_toolkits.mplot3d import Axes3D
+from cov import cov
+from dynamic plot import animate
 
 np.random.seed(19680801)
 
@@ -298,6 +300,8 @@ class SOM(object):
         '''
         #print('self layer num',self.layer_num)
 
+        #ani = animation.FuncAnimation(fig1, animate, interval=1000)
+
         if self.layer_num != 2:
             print('layer number does not match')
         else:
@@ -332,6 +336,9 @@ class SOM(object):
             print('in ' + str(e) + ' epoch' + ' the accuracy is: ')
             accu,_ = self.checkSimilarity(layer0,layer1)
             print(accu)
+
+            with open('accuracy_normal.txt', 'a') as the_file:
+                the_file.write(str(e)+',accu\n')
         #print(layer1)
         _ , pair = self.checkSimilarity(layer0,layer1)
         print('similarity after',self.checkSimilarity(layer0,layer1)[0])
@@ -388,6 +395,10 @@ class SOM(object):
             print('in ' + str(e) + ' epoch' + ' the accuracy is: ')
             accu,_ = self.checkSimilarity(layer0,layer1)
             print(accu)
+
+            with open('accuracy_iteration.txt', 'a') as the_file:
+                the_file.write(str(e)+',accu\n')
+
         #print(layer1)
         _ , pair = self.checkSimilarity(layer0,layer1)
         print('similarity after',self.checkSimilarity(layer0,layer1)[0])
@@ -401,12 +412,14 @@ class SOM(object):
         #print('difference',layer0-layer1)
         return self.checkSimilarity(layer0,layer1)[0] ## new added
 
-PARTICLE_NUM = 30
+PARTICLE_NUM = 300
 ITERATION = 300
 
 PHI_LEFT = 1.5
 PHI_RIGHT = 1
 NUM_PHI = 1
+
+
 
 PHI = np.linspace(PHI_LEFT,PHI_RIGHT,NUM_PHI)
 
