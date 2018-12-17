@@ -3,12 +3,13 @@ import matplotlib.pyplot as plt
 from nearest_neighbor import nb
 from mpl_toolkits.mplot3d import Axes3D
 from cov import cov
-from dynamic plot import animate
+import pandas as pd
+#from dynamic_plot import animate
 
 np.random.seed(19680801)
 
 class Frame(object):
-    def __init__(self,frame_dimension=2,frame_size=[1280,1080],num_p=10):
+    def __init__(self,frame_dimension=2,frame_size=[1280,1080],num_p=10,particles = np.zeros((10,2))):
         '''
         : frame_dimension  The frame is 2D or 3D
         : frame_size       The size of the canvas of frame e.g. [1280, 1080]
@@ -17,7 +18,7 @@ class Frame(object):
         self.frame_dimension = frame_dimension
         self.frame_size = frame_size
         self.num_particles = num_p
-        self.particles = []
+        self.particles = particles
 
     def random_particle(self):
         self.particles = np.zeros((self.num_particles,self.frame_dimension))
@@ -154,7 +155,7 @@ class SOM(object):
         : howMany          How many values to generate
         '''
         x0 = 0
-        x1 = np.sqrt(-sigma**2 * np.log(end_value / start_value))
+        x1 = np.sqrt(-sigma**2 * np.log(end_value / start_value))#?????
 
         x = np.linspace(x0,x1,num = howMany, endpoint = True)
         ret = []
@@ -188,6 +189,7 @@ class SOM(object):
         : sigma            The sigma to divide e.g. exp(-d**2/sigma**2)
         '''
 
+        # to do: can be optimized to improve efficiency
         for i in range(len(layer)):
             dist = np.linalg.norm(layer[i]-winner)
             #print('dist',dist)
@@ -217,7 +219,7 @@ class SOM(object):
         : return           The similarity between two sets of particles, e.g. 100%
         '''
 
-        threshold = 1
+        threshold = 0.1
         count = 0
         pair = []
         '''
@@ -241,7 +243,7 @@ class SOM(object):
                         break
             return count / layer1.shape[0], pair         
                 
-    def draw2Frame(self,layer0,layer1,pair,_3d = False):
+    def draw2Frame(self,layer0,layer1,pair,_3d = False,t='Tracking Result'):
         '''
         : layer0 & layer1  The sets of particles
         : pair             This is a list of paired particles [a,b] a is the index of the first layer and b is the index of the second layer
@@ -251,16 +253,18 @@ class SOM(object):
                 plt.arrow(layer0[i[0]][0],layer0[i[0]][1],
                           layer1[i[1]][0]-layer0[i[0]][0],layer1[i[1]][1]-layer0[i[0]][1],)
                           #length_includes_head=True)
-            plt.scatter(layer0[:,0],layer0[:,1],color = 'r',s=50,marker = 'o',label='layer0')
-            plt.scatter(layer1[:,0],layer1[:,1],color = 'g',s=50,marker = 'x',label='layer1')
+            plt.scatter(layer0[:,0],layer0[:,1],color = 'r',s=10,marker = 'o',label='Time t')
+            plt.scatter(layer1[:,0],layer1[:,1],color = 'g',s=10,marker = 'x',label='Time t+1')
             
             #plt.show()
         else:
             fig = plt.figure()
             ax = fig.gca(projection='3d')
-            ax.scatter(layer0[:,0],layer0[:,1],layer0[:,2],c='r',s=50,marker='o',label='layer0')
-            ax.scatter(layer1[:,0],layer1[:,1],layer1[:,2],c='g',s=50,marker='x',label='layer1')
-
+            ax.scatter(layer0[:,0],layer0[:,1],layer0[:,2],c='r',s=10,marker='o',label='Time t')
+            ax.scatter(layer1[:,0],layer1[:,1],layer1[:,2],c='g',s=10,marker='x',label='Time t+1')
+            ax.legend(loc=4)
+            plt.title(t)
+            
             for i in pair:
                 u = layer1[i,0] - layer0[i,0]
                 v = layer1[i,1] - layer0[i,1]
@@ -268,7 +272,7 @@ class SOM(object):
 
                 ax.quiver(layer0[i,0],layer0[i,1],layer0[i,2],u,v,w,pivot='tail')
 
-        #plt.show()  #eddited recently
+        plt.show()  #eddited recently
 
     def find_angle(self,v2,v1 = np.array([1,1,1]),original = np.array([0,0,0])):
         '''
@@ -340,15 +344,77 @@ class SOM(object):
             with open('accuracy_normal.txt', 'a') as the_file:
                 the_file.write(str(e)+',accu\n')
         #print(layer1)
-        _ , pair = self.checkSimilarity(layer0,layer1)
+        accu , pair = self.checkSimilarity(layer0,layer1)
         print('similarity after',self.checkSimilarity(layer0,layer1)[0])
 
         
         if frame1.frame_dimension == 2:
-            self.draw2Frame(frame1.particles,frame2.particles,pair,_3d = False)
+            self.draw2Frame(frame1.particles,frame2.particles,pair,_3d = False,
+                            t='Num of Particle' + str(layer0.shape[0])+' accu:'+' '+str(np.round(accu,4)))#here need to be modified because shape is hard coded
             plt.scatter(frame1.frame_size[0]/2,frame1.frame_size[1]/2,color = 'b',s=50,marker = 'v',label='center') # plot the center of frame
         elif frame1.frame_dimension == 3:
-            self.draw2Frame(frame1.particles,frame2.particles,pair,_3d = True)
+            self.draw2Frame(frame1.particles,frame2.particles,pair,_3d = True,
+                            t='Num of Particle: ' + str(layer0.shape[0])+' accu:'+' '+str(np.round(accu,4)))
+        #print('difference',layer0-layer1)
+        return self.checkSimilarity(layer0,layer1)[0] ## new added
+
+    def fit_2d_2sets(self,set1,set2,epoch):
+        '''
+        : set 1          The first layer's initiate particle value
+        : set 2          The second layer's initiate particle value
+        : epoch            The iteration times in fit, one epoch means update the second layer by the first and then update the first layer by the second
+        '''
+        #print('self layer num',self.layer_num)
+
+        #ani = animation.FuncAnimation(fig1, animate, interval=1000)
+
+        if self.layer_num != 2:
+            print('layer number does not match')
+
+
+        layer0 = np.array(set1).copy()
+        layer1 = np.array(set2).copy()
+        #layer1 = np.array(self.layer[0]).copy()
+
+        '''
+        : alpha is the initial coefficient to move particle  movement = alpha * distance
+        : r     is the initial distance between particles
+        '''
+
+        alpha = 0.1
+        r0 = frame1.statistics_2d()
+        r1 = frame2.statistics_2d()
+
+        print('similarity before',self.checkSimilarity(layer0,layer1)[0])
+
+        a = self.generateGaussian(alpha,0.01,1,epoch)
+
+        r00 = self.generateGaussian(r0,0.3*r0,1,epoch)
+        r11 = self.generateGaussian(r1,0.3*r0,1,epoch)
+        #print(layer1)
+        #print('   ')
+        for e in range(epoch):
+            for i in range(len(layer0)):
+                winner, displacement = self.findClosest(layer0[i],layer1)
+                self.move(layer1,winner,displacement,r11[e],a[e])
+            print('in ' + str(e) + ' epoch' + ' the accuracy is: ')
+            accu,_ = self.checkSimilarity(layer0,layer1)
+            print(accu)
+
+            with open('accuracy_normal.txt', 'a') as the_file:
+                the_file.write(str(e)+',accu\n')
+        #print(layer1)
+        accu , pair = self.checkSimilarity(layer0,layer1)
+        print('similarity after',self.checkSimilarity(layer0,layer1)[0])
+
+        
+        if frame1.frame_dimension == 2:
+            self.draw2Frame(frame1.particles,frame2.particles,pair,_3d = False,
+                            t='Num of Particle' + str(layer0.shape[0])+' accu:'+' '+str(np.round(accu,4)))#here need to be modified because shape is hard coded
+            plt.scatter(frame1.frame_size[0]/2,frame1.frame_size[1]/2,color = 'b',s=50,marker = 'v',label='center') # plot the center of frame
+        elif frame1.frame_dimension == 3:
+            self.draw2Frame(frame1.particles,frame2.particles,pair,_3d = True,
+                            t='Num of Particle: ' + str(layer0.shape[0])+' accu:'+' '+str(np.round(accu,4)))
         #print('difference',layer0-layer1)
         return self.checkSimilarity(layer0,layer1)[0] ## new added
 
@@ -400,34 +466,42 @@ class SOM(object):
                 the_file.write(str(e)+',accu\n')
 
         #print(layer1)
-        _ , pair = self.checkSimilarity(layer0,layer1)
+        accu , pair = self.checkSimilarity(layer0,layer1)
         print('similarity after',self.checkSimilarity(layer0,layer1)[0])
 
         
         if frame1.frame_dimension == 2:
-            self.draw2Frame(frame1.particles,frame2.particles,pair,_3d = False)
+            self.draw2Frame(frame1.particles,frame2.particles,pair,_3d = False,
+                            t='Num of Particle: ' + str(layer0.shape[0])+' accu:'+' '+str(np.round(accu,4)))
             plt.scatter(frame1.frame_size[0]/2,frame1.frame_size[1]/2,color = 'b',s=50,marker = 'v',label='center') # plot the center of frame
         elif frame1.frame_dimension == 3:
-            self.draw2Frame(frame1.particles,frame2.particles,pair,_3d = True)
+            self.draw2Frame(frame1.particles,frame2.particles,pair,_3d = True,
+                            t='Num of Particle: ' + str(layer0.shape[0])+' ' + ' accu:'+str(np.round(accu,4)))
         #print('difference',layer0-layer1)
         return self.checkSimilarity(layer0,layer1)[0] ## new added
 
-PARTICLE_NUM = 300
-ITERATION = 300
+PARTICLE_NUM = 100
+ITERATION = 10
 
-PHI_LEFT = 1.5
-PHI_RIGHT = 1
-NUM_PHI = 1
+PHI_LEFT = 1
+PHI_RIGHT = 5
+NUM_PHI = 5
 
+PHI = np.linspace(PHI_LEFT,PHI_RIGHT,NUM_PHI,endpoint = True)
 
+OMEGA_LEFT = 5
+OMEGA_RIGHT = 15
+NUM_OMEGA = 5
 
-PHI = np.linspace(PHI_LEFT,PHI_RIGHT,NUM_PHI)
+OMEGA = np.linspace(OMEGA_LEFT,OMEGA_RIGHT,NUM_OMEGA,endpoint = True)
 
 f1 = Frame(3,[1000,1000,1000],PARTICLE_NUM)
+f1_rotate = Frame(2,[1000,1000],PARTICLE_NUM)
 
-distance = f1.statistics_2d()
+distance = f1.statistics_2d()#???shouldn't be behind the frandom_particle()???
 
 f1.random_particle()
+f1_rotate.random_particle()
 
 velocities = []
 
@@ -435,24 +509,27 @@ for p in PHI:
     v = distance / p
     print('v',v)
     velocities.append([v,v,v])
+
+def main_rotate():
+    som = SOM()
+
+    results = []
+
+    for i in range(len(OMEGA)):
+        f2 = f1_rotate.move_rotation_2d(OMEGA[i])
+
+        som_accu = som.fit_2d_2frames(f1_rotate,f2,ITERATION)
+
+        _,nb_accu = nb(f1_rotate,f2,velocities[i])
+
+        results.append([som_accu,nb_accu,PHI[i]])
+
+    with open('results_rotate.txt', 'w') as filehandle:  
+        for listitem in results:
+            filehandle.write('%s\n' % listitem)
     
 def main():
     som = SOM()
-    #num_particles = 300
-    
-##    f1 = Frame(3,[1000,1000,1000],PARTICLE_NUM)
-##    f1.random_particle()
-
-##    distance = f1.statistics_2d()
-    
-##    phi = np.linspace(0.5,3,10)
-
-##    velocities = []
-
-##    for p in PHI:
-##        v = distance / p
-##        print('v',v)
-##        velocities.append([v,v,v])
 
     results = []
 
@@ -471,22 +548,6 @@ def main():
 
 def main_iteration():
     som = SOM()
-    #num_particles = 300
-    
-##    f1 = Frame(3,[1000,1000,1000],PARTICLE_NUM)
-##    f1.random_particle()
-
-##    distance = f1.statistics_2d()
-    
-##    phi = np.linspace(0.5,3,10)
-
-##    velocities = []
-##
-##    for p in PHI:
-##        v = distance / p
-##        print('v',v)
-##        velocities.append([v,v,v])
-
     results = []
 
     for i in range(len(PHI)):
@@ -500,16 +561,74 @@ def main_iteration():
 
     with open('results_iteration.txt', 'w') as filehandle:  
         for listitem in results:
-            filehandle.write('%s\n' % listitem)   
+            filehandle.write('%s\n' % listitem)
 
-main()
-main_iteration()
+
+def main_ansys():
+    ansys_data = pd.read_csv("./final sign (5) particle track file.csv",skiprows = 16,sep = '\t',
+                         names = ['ParticleResidenceTime','ParticleID','ParticleXPosition','ParticleYPosition','ParticleZPosition' ,
+                                  'ParticleXVelocity','ParticleYVelocity','ParticleZVelocity'])
+    features = ansys_data.shape[0]
+
+    zero_index = np.where(ansys_data['ParticleResidenceTime'] == 0)
+    zero_index = np.append(zero_index, features-1)
+
+    start = np.delete(zero_index,-1)
+    end = np.delete(zero_index,0)
+
+    features_per_particle = end - start
+    smallest_value = np.min(features_per_particle)
+
+    index = np.linspace(0, smallest_value, 5, endpoint = False,dtype=int)
+
+    chosen_frames = []
+    interval = 100
+    for i in index:
+        indices = start + i
+        first_image = ansys_data.loc[indices.tolist(),['ParticleXPosition','ParticleYPosition','ParticleZPosition']]
+        second_image = ansys_data.loc[(indices+interval).tolist(),['ParticleXPosition','ParticleYPosition','ParticleZPosition']]
+        chosen_frames.append([first_image,second_image])
+
+    som = SOM()
+    results = []
+    i = 1
+    
+    for one in chosen_frames:
+        first = Frame(frame_dimension=3,particles=np.array(one[0]))
+        second = Frame(frame_dimension=3,particles=np.array(one[1]))
+        print('first shape',first.particles.shape)
+        som_accu = som.fit_2d_2frames(first,second,ITERATION)
+
+        _,nb_accu = nb(first,second,velocities[0])
+
+        results.append([som_accu,nb_accu,i])
+        i+= 1
+
+    # here only the last frames pair is choosed
+##    first = Frame(frame_dimension=3,particles=np.array(chosen_frames[4][0]))
+##    second = Frame(frame_dimension=3,particles=np.array(chosen_frames[4][1]))
+##    print('first shape',first.particles.shape)
+##    som_accu = som.fit_2d_2frames(first,second,ITERATION)
+##
+##    _,nb_accu = nb(first,second,velocities[0])
+##
+##    results.append([som_accu,nb_accu,i])
+
+
+    with open('results_ansys.txt', 'w') as filehandle:  
+        for listitem in results:
+            filehandle.write('%s\n' % listitem)  
+#main()
+#main_iteration()
+#main_rotate()
+main_ansys()
+##
 ##som = SOM()
 ###f1 = Frame(2,[1000,1000],10)
 ##f1 = Frame(3,[1000,1000,1000],300)
 ##
 ##f1.random_particle()
-##print('f1 particles',f1.particles)
+###print('f1 particles',f1.particles)
 ###f2 = Frame(2,[1000,1000],200)
 ###velocity = [10,20]
 ##
