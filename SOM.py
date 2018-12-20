@@ -229,7 +229,7 @@ class SOM(object):
         if len(layer0) < len(layer1):
             for i in range(len(layer0)):
                 for j in range(len(layer1)):
-                    if np.linalg.norm(layer0[i]-layer1[j]) <= threshold:
+                    if np.linalg.norm(layer0[i]-layer1[j]) <= threshold and i == j:
                         count += 1
                         pair.append([i,j])
                         break
@@ -237,7 +237,7 @@ class SOM(object):
         else:
             for i in range(len(layer1)):
                 for j in range(len(layer0)):
-                    if np.linalg.norm(layer1[i]-layer0[j]) <= threshold:
+                    if np.linalg.norm(layer1[i]-layer0[j]) <= threshold and i == j:
                         count += 1
                         pair.append([j,i])
                         break
@@ -295,6 +295,28 @@ class SOM(object):
             return 0
         else:
             return np.arccos(cosine_angle) * 180 / np.pi
+
+    def fit_separate(self,frame1,frame2,epoch):
+        def separate(frame,d=3,axis=0):
+            median = np.median(frame.particles[:,axis])
+            left_idx = np.where(frame.particles[:,axis] <= median)
+            right_idx = np.where(frame.particles[:,axis] > median)
+
+            p1 = frame.particles[left_idx].copy()
+            p2 = frame.particles[right_idx].copy()
+            print('p1 shape ',p1.shape,'p2 shape ',p2.shape)
+            frame1 = Frame(frame_dimension=d,particles=p1)
+            frame2 = Frame(frame_dimension=d,particles=p2)
+
+            return frame1,frame2
+
+        f11,f12 = separate(frame1)
+        f21,f22 = separate(frame2)
+
+        accu1 = self.fit_2d_2frames(f11,f21,epoch)
+        accu2 = self.fit_2d_2frames(f12,f22,epoch)
+
+        return (accu1 + accu2) / 2 
                 
     def fit_2d_2frames(self,frame1,frame2,epoch):
         '''
@@ -305,7 +327,9 @@ class SOM(object):
         #print('self layer num',self.layer_num)
 
         #ani = animation.FuncAnimation(fig1, animate, interval=1000)
-
+        ceil = 2
+        floor = 0.1
+        
         if self.layer_num != 2:
             print('layer number does not match')
         else:
@@ -321,7 +345,7 @@ class SOM(object):
         : r     is the initial distance between particles
         '''
 
-        alpha = 0.1
+        alpha = 0.01
         r0 = frame1.statistics_2d()
         r1 = frame2.statistics_2d()
 
@@ -329,8 +353,8 @@ class SOM(object):
 
         a = self.generateGaussian(alpha,0.01,1,epoch)
 
-        r00 = self.generateGaussian(r0,0.3*r0,1,epoch)
-        r11 = self.generateGaussian(r1,0.3*r0,1,epoch)
+        r00 = self.generateGaussian(ceil * r0,floor*r0,1,epoch)
+        r11 = self.generateGaussian(ceil * r1,floor*r0,1,epoch)
         #print(layer1)
         #print('   ')
         for e in range(epoch):
@@ -609,9 +633,10 @@ def main_ansys():
 ##    second = Frame(frame_dimension=3,particles=np.array(chosen_frames[4][1]))
 ##    print('first shape',first.particles.shape)
 ##    som_accu = som.fit_2d_2frames(first,second,ITERATION)
-##
+##    som_accu_separate = som.fit_separate(first,second,ITERATION)
 ##    _,nb_accu = nb(first,second,velocities[0])
-##
+##    print("som_accu is :",som_accu)
+##    print("som_accu_separate is :",som_accu_separate)
 ##    results.append([som_accu,nb_accu,i])
 
 
